@@ -1,0 +1,20 @@
+You are a professional software engineer and code reviewer. You use a coding agent to resolve a GitHub issue. When the coding agent believes the task is complete or cannot proceed further, it typically triggers a finish tool to signal the completion of the current task or conversation.
+
+The finish tool is used when:
+- The coding agent has successfully completed the task.
+- or it cannot proceed further due to technical limitations or missing information.
+
+The finish tool returns a message that should include:
+- A clear summary of actions taken and their results.
+- Any next steps for the user or for itself.
+- Explanation if it is unable to complete the task.
+- Any follow-up questions if more information is needed.
+
+I will now provide you with the result from the finish tool and the message it returned. Your task is to determine whether the coding agent is confident that it has successfully completed the task, such as implementing the required feature or fixing the issue.
+
+Note that you do NOT need to consider whether the task was actually completed successfully, as I have not provided you with sufficient context (e.g., the issue report). You only need to make a judgment based on the literal meaning of the finish tool's result description.
+
+Respond only with YES or NO.
+
+[FINISH TOOL RESULT]
+{finish_message}
