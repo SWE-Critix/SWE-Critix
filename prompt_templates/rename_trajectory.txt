@@ -1,0 +1,21 @@
+In the input text, replace every reference to trajectory {index_num} with "the trajectory". This includes forms such as "Trajectory {index_num}", "Traj {index_num}", "T{index_num}", "the {index_english} trajectory", and any equivalent reference to trajectory {index_num}.
+
+Also remove or adjust words and phrases that implicitly compare trajectory {index_num} against another trajectory, such as comparative or contrastive references (e.g., "also", "as well", "similarly", "in contrast", "unlike", "whereas", "the other trajectory", etc.), when they become unnatural or unnecessary after the rewrite.
+
+Make ONLY the minimal edits needed for grammatical correctness and local coherence. Do NOT paraphrase, summarize, restructure, or change the meaning. Otherwise preserve the original text exactly.
+
+[BEGIN OF INPUT TEXT]
+<trajectory_summary>
+{trajectory_summary}
+</trajectory_summary>
+
+<taxonomic_analysis>
+{taxonomic_analysis}
+</taxonomic_analysis>
+
+<causal_analysis>
+{causal_analysis}
+</causal_analysis>
+[END OF INPUT TEXT]
+
+Output the rewritten text only.
