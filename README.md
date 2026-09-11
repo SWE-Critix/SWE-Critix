@@ -1,16 +1,12 @@
-<h1 align="center" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;">
-  <img src="assets/images/logo.jpeg" alt="Logo" style="height: 150px;">
-  <span>SWE-Critix: Post-training Generalist Verifiers for Assessing Coding Agent Trajectories</span>
-</h1>
-
-<!-- <p align="center">
-  <a href="" style="text-decoration: none; font-family: Gill Sans MT; font-weight: semibold;">Jiajun Hu, </a>
-  <a href="" style="text-decoration: none; font-family: Gill Sans MT; font-weight: semibold;">Chun Yong Chong</a>
-</p> -->
+<div align="center">
+  <img src="assets/images/logo.jpeg" alt="Logo" height="150">
+  
+  <h1>SWE-Critix: Post-training Generalist Verifiers for Assessing Coding Agent Trajectories</h1>
+</div>
 
 <div align="center">
 
-<a href="https://arxiv.org/pdf/xxxx.xxxxx"><img src="https://img.shields.io/static/v1?label=Coming soon&message=Paper&color=red">
+[![Paper](https://img.shields.io/static/v1?label=Coming%20soon&message=Paper&color=red&logo=arxiv&logoColor=white)](https://arxiv.org/pdf/xxxx.xxxxx)
 [![GitHub](https://img.shields.io/badge/GitHub-SWE--Critix-181717?logo=github&logoColor=white)](https://github.com/SWE-Critix/SWE-Critix)
 [![Hugging Face](https://img.shields.io/badge/Hugging%20Face-SWE--Critix-yellow?logo=huggingface)](https://huggingface.co/SWE-Critix)
 </a>
@@ -34,7 +30,7 @@ SWE-Critix adopts a three-stage post-training pipeline. First, a teacher model i
 We open source the model weights, datasets, and training scripts 
 - [SFT checkpoint](https://huggingface.co/SWE-Critix/SWE-Critix-Qwen3-30B-A3B-SFT-Epoch3) and [RL checkpoint](https://huggingface.co/SWE-Critix/SWE-Critix-Qwen3-30B-A3B-RL-Step-3396)
 - [SFT dataset](https://huggingface.co/datasets/SWE-Critix/alpaca_style_sft_dataset), [RL dataset](https://huggingface.co/datasets/SWE-Critix/rl_dataset), and [Test dataset](https://huggingface.co/datasets/SWE-Critix/test_dataset)
-- [Training scripts](https://github.com/SWE-Critix/SWE-Critix)
+- [Training scripts (tested on Ascend 910 NPUs)](https://github.com/SWE-Critix/SWE-Critix)
 
 
 ## Data Collection
@@ -70,3 +66,31 @@ We then split the data into SFT, RL, and test sets according to the following pr
 3. For the RL set, we first include all failed trajectories and then sample successful trajectories in a round-robin fashion across issues until the two classes are balanced. This maximizes both the number of trajectories and the coverage of distinct issues.
 
 The final data distribution is summarized in [Figure 1 — Data Splits](#fig1).
+
+
+## CoT Annotation
+
+We use a more capable teacher LLM to generate CoT annotations. Specifically, for each pair of successful and failed trajectories of an issue in the SFT set, we instruct the teacher LLM to comparatively analyze the two trajectories, identifying the root causes of failure in the failed trajectory and the key reasons for success in the successful trajectory. We use [this prompt template](./prompt_templates/pairwise_evaluate_coding_agent_trajectories.txt), where `{traj_1}` and `{traj_2}` correspond to the failed and successful trajectories, respectively. The teacher LLM produces responses in the following format:
+
+```
+<issue_specification> # A concise summary of the issue specification </issue_specification>
+<trajectory_1_summary> # A concise summary of the issue-solving procedure of trjactory 1 </trajectory_1_summary>
+<trajectory_2_summary> # A concise summary of the issue-solving procedure of trjactory 2 </trajectory_2_summary>
+<other_mistake_categories> # Newly-proposed mistake categories when the predefined taxonomy cannot fit </other_mistake_categories>
+<differential_reasoning> # Key differences between trajectory 1 and 2 </differential_reasoning>
+<trajectory_1_taxonomic_analysis> # Evidence of mistake patterns that were made or averted in trajectory 1 </trajectory_1_taxonomic_analysis>
+<trajectory_2_taxonomic_analysis> # Evidence of mistake patterns that were made or averted in trajectory 2 </trajectory_2_taxonomic_analysis>
+<trajectory_1_causal_analysis> # A causal analysis to answer the root causes of trajectory 1's failure </trajectory_1_causal_analysis>
+<trajectory_2_causal_analysis> # A causal analysis to answer the key factors behind trajectory 2's success </trajectory_2_causal_analysis>
+```
+
+We extract the `summary`, `taxonomic_analysis`, and `causal_analysis` sections as the CoT for each trajectory. Before assembling the final SFT samples, we perform grammatical post-processing on the six sections extracted above. Since the annotations are generated through pairwise comparison, each section may explicitly or implicitly refer to the presence of both trajectories. Explicit references include trajectory identifiers such as "Traj 1", "T2", or "the first trajectory", while implicit references include comparative terms such as "also", "as well", and "whereas". However, our goal is to train the final model to perform pointwise judgment, meaning that the CoT for a given trajectory should not contain any words or phrases that imply the existence of another trajectory. We therefore use the same teacher model to rewrite these sections accordingly, following [this prompt template](./prompt_templates/rename_trajectory.txt).
+
+The post-processed CoTs are then assembled into the SFT samples. Conceptually, an SFT sample takes the following form:
+
+```
+Input: please evaluate whether the trajectory successfully resolved the issue. {trajectory}
+Output: {CoT = summary + taxonomic_analysis + causal_analysis} <judgment>{YES/NO}</judgment>
+```
+
+This training format encourages the model to first summarize the trajectory, identify evidence of potential failure patterns, and reason causally about the outcome before making the final judgment.
