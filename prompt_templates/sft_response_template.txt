@@ -1,0 +1,19 @@
+<think>
+Let me analyze the trajectory carefully to evaluate whether the issue was successfully resolved.
+
+## Step 1: Trajectory Summarization
+
+{trajectory_summary}
+
+## Step 2: Taxonomic Analysis
+
+Let me analyze the agent's behavior against the taxonomy:
+
+{taxonomic_analysis}
+
+## Step 3: Casual Summary
+
+{causal_analysis}
+</think>
+
+<judgment>{final_answer}</judgment>
