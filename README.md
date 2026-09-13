@@ -28,9 +28,9 @@ SWE-Critix presents an LLM post-training pipeline for evaluating coding-agent tr
 SWE-Critix adopts a three-stage post-training pipeline. First, a teacher model is prompted to analyze a pair of correct and incorrect trajectories for the same issue. Through comparative analysis, the teacher summarizes the respective procedures, key differences, error types, and factors contributing to the success or failure of each trajectory. These summaries serve as the CoT rationales for subsequent training (Figure 1 - CoT Annotation). The resulting dataset with annotated CoT rationales is then assembled into SFT training samples, which are used to fine-tune the model (Figure 1 - SFT). Finally, SWE-Critix applies reinforcement learning to the remaining trajectories without CoT annotations. The unit testing results of the trajectories are used as the ground truth for computing the reward signal (Figure 1 - RL).
 
 We open source the model weights, datasets, and training scripts 
-- [SFT checkpoint](https://huggingface.co/SWE-Critix/SWE-Critix-Qwen3-30B-A3B-SFT-Epoch3) and [RL checkpoint](https://huggingface.co/SWE-Critix/SWE-Critix-Qwen3-30B-A3B-RL-Step-3396)
-- [SFT dataset](https://huggingface.co/datasets/SWE-Critix/alpaca_style_sft_dataset), [RL dataset](https://huggingface.co/datasets/SWE-Critix/rl_dataset), and [Test dataset](https://huggingface.co/datasets/SWE-Critix/test_dataset)
-- [Training scripts (tested on Ascend 910 NPUs)](https://github.com/SWE-Critix/SWE-Critix)
+- [SFT](https://huggingface.co/SWE-Critix/SWE-Critix-Qwen3-30B-A3B-SFT-Epoch3) and [RL](https://huggingface.co/SWE-Critix/SWE-Critix-Qwen3-30B-A3B-RL-Step-3396) checkpoints
+- [SFT](https://huggingface.co/datasets/SWE-Critix/alpaca_style_sft_dataset), [RL](https://huggingface.co/datasets/SWE-Critix/rl_dataset), and [Test](https://huggingface.co/datasets/SWE-Critix/test_dataset) datasets
+- [SFT](./scripts/sft) and [RL](./scripts/sft/rl) training scripts (tested on Ascend 910 NPUs)
 
 
 ## Data Collection
@@ -56,7 +56,7 @@ We collect the training and evaluation data from [CoderForge-Preview](https://ww
 We further curate the dataset using the following three rules. A trajectory is discarded if it satisfies **any** of the following conditions:
 
 1. **reward == -1**. In CoderForge-Preview, `reward = 1/0` indicates that the trajectory passes or fails the tests, while `reward = -1` has no clear meaning.
-2. **Trajectory length > 65,536**. Trajectories exceeding the length limit are filtered out. Since [CoderForge-Preview HuggingFace repository](https://huggingface.co/datasets/togethercomputer/CoderForge-Preview) directly provides tokenized trajectories, we compute the trajectory length using `len(input_ids)`.
+2. **Trajectory length > 65,536**. Trajectories exceeding the length limit are filtered out. Since [CoderForge-Preview Hugging Face repository](https://huggingface.co/datasets/togethercomputer/CoderForge-Preview) directly provides tokenized trajectories, we compute the trajectory length using `len(input_ids)`.
 3. **Incomplete trajectory**. If the agent itself does not consider the task to be completed, there is no need to further evaluate the trajectory. To identify such trajectories, we extract the final assistant message from each trajectory and use [Qwen3.5-27B](https://huggingface.co/Qwen/Qwen3.5-27B) to determine whether the task has been completed ([Prompt Template](./prompt_templates/exam_openhands_finish_message_prompt_template.txt)).
 
 We then split the data into SFT, RL, and test sets according to the following procedure:
@@ -94,3 +94,138 @@ Output: {CoT = summary + taxonomic_analysis + causal_analysis} <judgment>{YES/NO
 ```
 
 This training format encourages the model to first summarize the trajectory, identify evidence of potential failure patterns, and reason causally about the outcome before making the final judgment.
+
+
+## SFT
+
+We release the annotated SFT dataset on [Hugging Face](https://huggingface.co/datasets/SWE-Critix/alpaca_style_sft_dataset). It has already been stored in an alpaca-style format that can be directly consumed by the SFT framework [MindSpeed-LLM](https://gitcode.com/Ascend/MindSpeed-LLM) that we use. MindSpeed-LLM is a distributed LLM training framework designed for Ascend chips. It inherits [Megatron-LM](https://github.com/nvidia/megatron-lm)'s distributed training capabilities such as tensor, pipeline, and sequence parallelism strategies while providing optimizations for Ascend NPUs. Before getting started, please follow the [install guide](https://gitcode.com/Ascend/MindSpeed-LLM/blob/master/docs/en/pytorch/training/install_guide.md) to properly install MindSpeed-LLM. We provide a [environment.md](./scripts/sft/environment.md) for reference.
+
+It typically involves four steps to SFT a base model: (1) tokenize an alpaca-style dataset; (2) convert Hugging Face weights to Megatron format; (3) train the model; (4) convert Megatron weights back to Hugging Face format. Except for Step (3), the remaining three steps can be executed on a single node with a single NPU card. We use [Qwen3-30B-A3B-Thinking-2507](https://huggingface.co/Qwen/Qwen3-30B-A3B-Thinking-2507) as the base model, so please download the weights on your machines.
+
+#### Step1: Tokenize an alpaca-style dataset
+
+We use [this script](./scripts/sft/tokenize_data_type_qwen3.sh) to tokenize the alpaca-style SFT dataset into token ID sequences and mask labels:
+
+```
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/nnal/atb/set_env.sh
+
+mkdir /path/to/tokenized_dataset
+
+cd /path/to/MindSpeed-LLM
+
+bash /path/to/SWE-Critix/scripts/sft/tokenize_data_type_qwen3.sh \
+  /path/to/Qwen3-30B-A3B-Thinking-2507 \
+  --data_url=/path/to/alpaca_style_sft_dataset \
+  --output_dir=/path/to/tokenized_dataset
+```
+
+After tokenization is complete, you may find six files under the output dir. The three `.bin` files are explained below:
+
+1. `..._input_ids_document.bin`: Stores the token ID sequences of all samples, i.e., the integer arrays obtained by encoding the original text with the tokenizer.
+
+2. `..._labels_document.bin`: Stores the training labels, with the same structure as `input_ids`. Positions corresponding to the prompt are set to `-100`, while the response positions retain their actual token IDs and are therefore used for loss computation.
+
+3. `..._attention_mask_document.bin`: Stores the sample ID to which each token belongs, preventing tokens in different samples from attending to one another. In the packed setting, the values `1, 2, 3, ...` are used to distinguish consecutively concatenated samples within a pack, while the trailing `0` indicates padding.
+
+Converting `..._input_ids_document.bin` back into text helps understanding the SFT data format, which is represented as follows:
+
+```
+<|im_start|>system\n{system}<|im_end|>\n<|im_start|>user\n{instruction}<|im_end|>\n<|im_start|>assistant\n<think>\n{CoT}\n</think>\n\n{answer}<|im_end|>\n
+```
+
+Only the following portion contributes to the training loss:
+
+```
+<think>\n{CoT}\n</think>\n\n{answer}<|im_end|>\n
+```
+
+#### Step2: Convert Hugging Face weights to Megatron format
+
+We use [this script](./scripts/sft/ckpt_convert_qwen3_moe_hf2mcore.sh) to convert Hugging Face weights to Megatron format, which is a distributed checkpoint format for efficient large-scale training:
+
+```
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/nnal/atb/set_env.sh
+
+mkdir /path/to/megatron_checkpoints  # a dir storing all checkpoints, to facilitate resuming training from any checkpoint
+mkdir /path/to/megatron_checkpoints/iter_0000001
+touch /path/to/megatron_checkpoints/latest_checkpointed_iteration.txt
+printf "1" > /path/to/megatron_checkpoints/latest_checkpointed_iteration.txt
+
+cd /path/to/MindSpeed-LLM
+
+bash /path/to/SWE-Critix/scripts/sft/ckpt_convert_qwen3_moe_hf2mcore.sh \
+  2 \
+  2 \
+  16 \
+  1 \
+  --data_url=/path/to/Qwen3-30B-A3B-Thinking-2507 \
+  --output_dir=/path/to/megatron_checkpoints/iter_0000001
+```
+
+We configure `TP=2`, `PP=2`, `EP=16`, and `ETP=1` for distributed training across 16 Atlas A2 nodes, each equipped with 8 Ascend 910B1/B2-64 GB NPUs.
+
+#### Step3: Train the model
+
+We use [this script](./scripts/sft/sft_qwen3_30b_a3b_70k_full_no_pack_a2.sh) to launch or resume training:
+
+```
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/nnal/atb/set_env.sh
+
+cd /path/to/MindSpeed-LLM
+
+bash /path/to/SWE-Critix/scripts/sft/sft_qwen3_30b_a3b_70k_full_no_pack_a2.sh \
+  /path/to/Qwen3-30B-A3B-Thinking-2507 \
+  2 \
+  2 \
+  16 \
+  1 \
+  16 \
+  32 \
+  975 \
+  71680 \
+  325 \
+  --data_url=/path/to/tokenized_dataset \
+  --output_dir=/path/to/megatron_checkpoints
+```
+
+We configure `TP=2`, `PP=2`, `EP=16`, `ETP=1`, `CP=16`, `Globe Batch Size=32`, `Train Iterations=975` (i.e., 3 epochs), `Sequence Length=71680`, `Save Interval=325` (i.e., save a checkpoint every epoch). We use [ModelArts](https://www.huaweicloud.com/intl/en-us/product/modelarts.html), a cloud-based AI development and training platform, for training. If you use a different platform, you will need to additionally configure the following four parameters in the training script.
+
+```
+NNODES - number of nodes
+NPUS_PER_NODE - number of NPUs in a single node
+MASTER_ADDR - master node IP
+NODE_RANK - node rank (0, 1, 2, ...)
+```
+
+We show the SFT loss curve in [Figure 2](#fig2).
+<br>
+
+<div id="fig2" align="center">
+  <img src="./assets/images/mindspeed_loss.png" alt="sft loss" style="max-width: 80%; height: auto;">
+  <p style="font-size: 0.9em; color: #666;">Figure 2: SFT Loss Curve</p>
+</div>
+
+<br>
+
+#### Step 4: Convert Megatron weights back to Hugging Face format
+
+After training is complete, we use [this script](./scripts/sft/ckpt_convert_qwen3_moe_mcore2hf.sh) to convert a specified Megatron checkpoint, determined by the iteration number in `/path/to/megatron_checkpoints/latest_checkpointed_iteration`, back to its Hugging Face format:
+
+```
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/nnal/atb/set_env.sh
+
+mkdir /path/to/Hugging_Face_weights
+
+cd /path/to/MindSpeed-LLM
+
+bash /path/to/SWE-Critix/scripts/sft/ckpt_convert_qwen3_moe_mcore2hf.sh \
+  /path/to/Qwen3-30B-A3B-Thinking-2507 \
+  --data_url=/path/to/megatron_checkpoints \
+  --output_dir=/path/to/Hugging_Face_weights
+```
+
+We release the checkpoint at iteration 975 (i.e., epoch 3) on [Hugging Face](https://huggingface.co/SWE-Critix/SWE-Critix-Qwen3-30B-A3B-SFT-Epoch3).
