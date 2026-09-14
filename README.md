@@ -98,13 +98,13 @@ This training format encourages the model to first summarize the trajectory, ide
 
 ## SFT
 
-We release the annotated SFT dataset on [Hugging Face](https://huggingface.co/datasets/SWE-Critix/alpaca_style_sft_dataset). It has already been stored in an alpaca-style format that can be directly consumed by the SFT framework [MindSpeed-LLM](https://gitcode.com/Ascend/MindSpeed-LLM) that we use. MindSpeed-LLM is a distributed LLM training framework designed for Ascend chips. It inherits [Megatron-LM](https://github.com/nvidia/megatron-lm)'s distributed training capabilities such as tensor, pipeline, and sequence parallelism strategies while providing optimizations for Ascend NPUs. Before getting started, please follow the [install guide](https://gitcode.com/Ascend/MindSpeed-LLM/blob/master/docs/en/pytorch/training/install_guide.md) to properly install MindSpeed-LLM. We provide a [environment.md](./scripts/sft/environment.md) for reference.
+We release the annotated SFT dataset on [Hugging Face](https://huggingface.co/datasets/SWE-Critix/alpaca_style_sft_dataset). It has already been stored in an alpaca-style format that can be directly consumed by [MindSpeed-LLM](https://gitcode.com/Ascend/MindSpeed-LLM), the SFT framework that we use. MindSpeed-LLM is a distributed LLM training framework designed for Ascend chips. It inherits [Megatron-LM](https://github.com/nvidia/megatron-lm)'s distributed training capabilities such as tensor, pipeline, and sequence parallelism strategies while providing optimizations for Ascend NPUs. Before getting started, please follow the [install guide](https://gitcode.com/Ascend/MindSpeed-LLM/blob/master/docs/en/pytorch/training/install_guide.md) to properly install MindSpeed-LLM. We provide a [environment.md](./scripts/sft/environment.md) for reference.
 
 It typically involves four steps to SFT a base model: (1) tokenize an alpaca-style dataset; (2) convert Hugging Face weights to Megatron format; (3) train the model; (4) convert Megatron weights back to Hugging Face format. Except for Step (3), the remaining three steps can be executed on a single node with a single NPU card. We use [Qwen3-30B-A3B-Thinking-2507](https://huggingface.co/Qwen/Qwen3-30B-A3B-Thinking-2507) as the base model, so please download the weights on your machines.
 
-#### Step1: Tokenize an alpaca-style dataset
+#### Step 1: Tokenize an alpaca-style dataset
 
-We use [this script](./scripts/sft/tokenize_data_type_qwen3.sh) to tokenize the alpaca-style SFT dataset into token ID sequences and mask labels:
+We use [tokenize_data_type_qwen3.sh](./scripts/sft/tokenize_data_type_qwen3.sh) to tokenize the alpaca-style SFT dataset into token ID sequences and mask labels:
 
 ```
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
@@ -140,9 +140,9 @@ Only the following portion contributes to the training loss:
 <think>\n{CoT}\n</think>\n\n{answer}<|im_end|>\n
 ```
 
-#### Step2: Convert Hugging Face weights to Megatron format
+#### Step 2: Convert Hugging Face weights to Megatron format
 
-We use [this script](./scripts/sft/ckpt_convert_qwen3_moe_hf2mcore.sh) to convert Hugging Face weights to Megatron format, which is a distributed checkpoint format for efficient large-scale training:
+We use [ckpt_convert_qwen3_moe_hf2mcore.sh](./scripts/sft/ckpt_convert_qwen3_moe_hf2mcore.sh) to convert Hugging Face weights to Megatron format, which is a distributed checkpoint format for efficient large-scale training:
 
 ```
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
@@ -166,9 +166,9 @@ bash /path/to/SWE-Critix/scripts/sft/ckpt_convert_qwen3_moe_hf2mcore.sh \
 
 We configure `TP=2`, `PP=2`, `EP=16`, and `ETP=1` for distributed training across 16 Atlas A2 nodes, each equipped with 8 Ascend 910B1/B2-64 GB NPUs.
 
-#### Step3: Train the model
+#### Step 3: Train the model
 
-We use [this script](./scripts/sft/sft_qwen3_30b_a3b_70k_full_no_pack_a2.sh) to launch or resume training:
+We use [sft_qwen3_30b_a3b_70k_full_no_pack_a2.sh](./scripts/sft/sft_qwen3_30b_a3b_70k_full_no_pack_a2.sh) to launch or resume training:
 
 ```
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
@@ -212,7 +212,7 @@ We show the SFT loss curve in [Figure 2](#fig2).
 
 #### Step 4: Convert Megatron weights back to Hugging Face format
 
-After training is complete, we use [this script](./scripts/sft/ckpt_convert_qwen3_moe_mcore2hf.sh) to convert a specified Megatron checkpoint, determined by the iteration number in `/path/to/megatron_checkpoints/latest_checkpointed_iteration`, back to its Hugging Face format:
+After training is complete, we use [ckpt_convert_qwen3_moe_mcore2hf.sh](./scripts/sft/ckpt_convert_qwen3_moe_mcore2hf.sh) to convert a specified Megatron checkpoint, determined by the iteration number in `/path/to/megatron_checkpoints/latest_checkpointed_iteration.txt`, back to its Hugging Face format:
 
 ```
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
@@ -229,3 +229,88 @@ bash /path/to/SWE-Critix/scripts/sft/ckpt_convert_qwen3_moe_mcore2hf.sh \
 ```
 
 We release the checkpoint at iteration 975 (i.e., epoch 3) on [Hugging Face](https://huggingface.co/SWE-Critix/SWE-Critix-Qwen3-30B-A3B-SFT-Epoch3).
+
+
+## RL
+
+We release the RL dataset on [Hugging Face](https://huggingface.co/datasets/SWE-Critix/rl_dataset). It has already been stored in a format that can be directly consumed by [VeRL](https://github.com/verl-project/verl), the RL framework that we use. VeRL is an LLM reinforcement learning framework designed to support scalable and efficient post-training with popular algorithms such as PPO and GRPO. It provides a modular architecture that integrates distributed training, rollout generation, and reward computation. Before getting started, please follow the [install guide](./scripts/rl/install.md) to properly install VeRL.
+
+We apply a simple yet effective [outcome reward function](./scripts/rl/reward.py). A rollout receives a reward of +1 if its predicted judgment is consistent with the ground truth derived from unit testing, and -1 otherwise.
+
+Similar to the SFT pipeline, it involves three steps in the RL pipeline: (1) convert Hugging Face weights to Megatron format; (2) train the model; (3) convert Megatron weights back to Hugging Face format. Except for Step (2), the remaining two steps can be executed on a single node with a single NPU card. We use the [last SFT checkpoint](https://huggingface.co/SWE-Critix/SWE-Critix-Qwen3-30B-A3B-SFT-Epoch3) as the initial RL checkpoint.
+
+#### Step 1: Convert Hugging Face weights to Megatron format
+
+We use the following script to convert Hugging Face weights to Megatron format:
+
+```
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/nnal/atb/set_env.sh
+
+mkdir /path/to/Megatron_weight
+
+cd /path/to/verl
+
+python scripts/converter_hf_to_mcore.py \
+  --hf_model_path /path/to/sft_checkpoint \
+  --output_path /path/to/Megatron_weight \
+  --use_cpu_initialization
+```
+#### Step 2: Train the model
+
+We use [run_ray_qwen3-30b-a3b_128k_grpo_megatron_vllm_npu.sh](./scripts/rl/run_ray_qwen3-30b-a3b_128k_grpo_megatron_vllm_npu.sh) and [run_qwen3-30b-a3b_128k_grpo_megatron_vllm_npu.sh](./scripts/rl/run_qwen3-30b-a3b_128k_grpo_megatron_vllm_npu.sh) to launch RL training:
+
+```
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/nnal/atb/set_env.sh
+export LD_PRELOAD=/usr/local/lib/libjemalloc.so.2
+
+mkdir /path/to/checkpoints
+
+cd /path/to/verl
+
+bash /path/to/SWE-Critix/scripts/rl/run_ray_qwen3-30b-a3b_128k_grpo_megatron_vllm_npu.sh
+```
+
+The parameters that must be configured in these two scripts are marked as `# NEED CONFIG`. We use [vLLM](https://vllm.ai/) as the rollout backend and megatron as the training backend. We use [GRPO](https://arxiv.org/abs/2402.03300) as the policy gradient algoritgm and set group size as 8. We perform distributed training across 8 Atlas A3 nodes, each equipped with 16 Ascend 910C-64 GB NPUs. Please refer to [Figure 1 - RL](#fig1) or the training scripts for detailed hyperparameter configurations. We use [ModelArts](https://www.huaweicloud.com/intl/en-us/product/modelarts.html) for training. If you use a different platform, you will need to additionally configure the following five parameters in these two training scripts.
+
+```
+NNODES - number of nodes
+NPUS_PER_NODE - number of NPUs in a single node
+MASTER_ADDR - master node IP
+NIC - current node network inferface card
+CURRENT_IP - current node IP
+```
+
+We show the RL reward curve in [Figure 3](#fig3).
+<br>
+
+<div id="fig3" align="center">
+  <img src="./assets/images/verl_reward.png" alt="rl reward" style="max-width: 100%; height: auto;">
+  <p style="font-size: 0.9em; color: #666;">Figure 3: RL Reward Curve</p>
+</div>
+
+<br>
+
+**NOTE**: The version of vLLM (0.18.0) included in the VeRL image used in our experiments does not yet support [Router Replay](https://arxiv.org/abs/2510.11370). This may lead to inconsistencies between MoE training and inference, as the expert routing decisions made during rollout cannot be guaranteed to be reproduced during training.
+
+#### Step 3: Convert Megatron weights back to Hugging Face format
+
+After training is complete, we use the following script to convert a Megatron checkpoint back to its Hugging Face format:
+
+```
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/nnal/atb/set_env.sh
+
+mkdir /path/to/merged_hf_model
+
+cd /path/to/verl
+
+python -m verl.model_merger merge \
+  --backend megatron \
+  --local_dir /path/to/checkpoints/project_name/experiment_name/global_step_XXX/actor \
+  --target_dir /path/to/merged_hf_model \
+  --use_cpu_initialization
+```
+
+We release the checkpoint at iteration 3396 on [Hugging Face](https://huggingface.co/SWE-Critix/SWE-Critix-Qwen3-30B-A3B-RL-Step-3396).
