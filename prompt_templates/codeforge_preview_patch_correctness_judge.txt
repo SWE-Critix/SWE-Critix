@@ -1,0 +1,107 @@
+<|im_start|>system
+You are a professional software engineer and code reviewer.<|im_end|>
+<|im_start|>user
+I use the OpenHands agent, an AI coding assistant, to automatically resolve GitHub issues (e.g., bug fixes and feature implementations). While solving an issue, OpenHands generates a trajectory that records the entire problem-solving process, including problem understanding, repository exploration, code implementation, debugging, testing, and code review. A trajectory takes the following format:
+
+[BEGIN OF TRAJECTORY FORMAT]
+A trajectory consists of a system block and multiple interleaved user and assistant blocks.
+• **system block**: Enclosed by `<|im_start|>system\n` and `<|im_end|>`. It defines the agent's role, behavioral constraints, guidelines, requirements, and the four available tools: bash execution (`execute_bash`), file editing (`str_replace_editor`), log thinking (`think`), and task completion (`finish`).
+• **user block**: Enclosed by `<|im_start|>user\n` and `<|im_end|>`. It represents the task context and environment feedback provided to the assistant. It typically includes the initial problem specification and iterative observations such as tool outputs, file contents, execution logs, and test results. It serves as the interface through which the environment communicates state and validation signals back to the assistant, enabling it to update its reasoning and actions based on concrete runtime feedback.
+• **assistant block**: Enclosed by `<|im_start|>assistant\n` and `<|im_end|>`. It represents the agent's decision-making and action step in response to the current context. It typically includes reasoning about the problem, planning next steps, and concrete actions such as tool calls (e.g., editing code, running commands) or producing patches. It may also reflect iterative debugging, adjustments based on prior feedback, and attempts to satisfy the specification.
+[END OF TRAJECTORY FORMAT]
+
+I will now provide an OpenHands agent trajectory for solving an issue. Your task is to evaluate **whether the trajectory successfully resolved the issue**.
+
+[BEGIN OF TRAJECTORY]
+{chat_template_applied}
+[END OF TRAJECTORY]
+
+Note that OpenHands operates without access to the ground-truth tests during the problem-solving process. Therefore, even if the agent uses existing repository tests or self-generated tests in a trajectory to verify its solution, such validation is not based on the ground-truth tests and is thus NOT reliable evidence of correctness.
+
+You MUST strictly follow the internal analysis guidelines below before generating the final answer.
+
+[BEGIN OF INTERNAL ANALYSIS GUIDELINES]
+**Step 1: Trajectory Summarization**
+Before evaluating the trajectory, carefully read it in full and produce a concise and factual summary of what the agent did, including key steps such as problem understanding, repository exploration, implementation, debugging, and testing. The summary should focus on the sequence of actions and major decisions, rather than low-level execution details. At this step, do NOT analyze whether the trajectory successfully resolved the issue or the causes for its success or failure.
+
+During internal reasoning, structure the summary as:
+
+```
+## Step 1: Trajectory Summarization
+
+...
+```
+
+**Step 2: Taxonomic Analysis**
+Thoroughly analyze the root causes of success or failure in the trajectory according to the **Agent Mistake Taxonomy** framework below, which contains 13 predefined mistake categories and one additional open-ended "others" category for reasonable mistake patterns not covered by the predefined taxonomy. You MUST strictly follow the taxonomy framework to characterize and explain the relevant agent behaviors.
+
+[BEGIN OF AGENT MISTAKE TAXONOMY]
+• **1. misunderstands specifications or instructions**, meaning the agent fails to correctly implement the primary intended behavior described in the issue, or does not follow explicit instructions or constraints.
+• **2. violates minimal and localized change principles**, meaning the agent modifies code, configuration, or behavior beyond what is necessary to resolve the issue, implements unrequested features, introduces unrelated refactorings, or spreads changes across unrelated components without clear justification.
+• **3. delivers incomplete code**, meaning the agent produces a partial, unfinished, or non-functional implementation that does not fully resolve the issue or cannot operate as intended (e.g., omits required logic, leaves TODOs or placeholders without completion, implements only a subset of necessary functionality, fails to integrate changes across all relevant components, or introduces code that cannot compile, run, or pass basic validation due to missing pieces or incomplete wiring).
+• **4. introduces core logical or algorithmic mistakes**, meaning the agent implements incorrect logic (e.g., incorrect condition checks, flawed control flow, or improper state transitions), flawed reasoning, or invalid algorithmic behavior (e.g., wrong invariants, incorrect updates, misuse of data structures) that leads to wrong results even under normal, expected inputs.
+• **5. fails to correctly handle edge cases or boundary conditions**, meaning the agent behaves incorrectly under valid but extreme, rare, or boundary inputs (e.g., empty inputs, minimum/maximum limits, single-element cases), often due to implicit and invalid assumptions about input ranges or data shapes, especially near system or specification limits.
+• **6. violates library or API constraints**, meaning the agent uses external or internal libraries, frameworks, or APIs in ways that contradict their documented contracts, usage requirements, or supported patterns (e.g., calls APIs with invalid parameters or in invalid states, ignores required call sequences, bypasses required abstraction or configuration layers).
+• **7. fails to correctly handle exceptions or errors**, meaning the agent incorrectly detects, signals, propagates, or handles error conditions during execution (e.g., swallows errors that should be surfaced, introduces crashes or undefined behavior for detectable error conditions, returns success when an operation fails).
+• **8. degrades performance or resource efficiency**, meaning the agent introduces unnecessary computational overhead, inefficient algorithms, excessive memory or resource consumption, or resource management problems that negatively impact runtime efficiency or scalability (e.g., introduces avoidable time or space complexity regressions, unnecessary blocking or synchronization, excessive allocations or copies, resource leaks, or inefficient use of hardware or system resources).
+• **9. compromises security or safety**, meaning the agent creates or fails to prevent vulnerabilities, unsafe operations, or violations of trust, isolation, or protection boundaries (e.g., introduces injection risks, unsafe deserialization, improper input trust, missing or weakened validation for security-sensitive inputs, exposure of sensitive data, privilege or authorization bypass, unsafe handling of secrets or credentials, unsafe concurrency affecting safety guarantees, or unsafe interactions with external systems or resources).
+• **10. breaks backward compatibility**, meaning the agent changes externally observable behavior, interfaces, data formats, configuration semantics, or persistence expectations in ways that can break existing users, integrations, or stored data (e.g., changes public interfaces, removes or alters supported configuration or flags, changes persisted data formats or protocols without compatibility handling, alters default behavior in a breaking way, or introduces upgrade or downgrade risks for existing deployments).
+• **11. misconfigures environment or infrastructure**, meaning the agent sets up or relies on an incorrect, incomplete, or inconsistent execution environment that prevents the system from functioning as intended (e.g., uses the wrong runtime, container, or hardware configuration; installs incorrect packages or incompatible versions; misconfigures dependencies, build systems, or paths; omits required environment variables, credentials, or API keys; uses invalid or unavailable network endpoints).
+• **12. undermines determinism or testability**, meaning the agent introduces nondeterministic behavior (e.g., unseeded randomness, wall-clock dependencies, network I/O) that would make tests flaky, or produces unstable or vague outputs (e.g., variable strings, inconsistent exceptions, unclear error messages) that a test could not reliably assert against.
+• **13. compromises test or harness integrity**, meaning the agent achieves apparent success by bypassing, weakening, or manipulating validation mechanisms rather than correctly solving the underlying issue. This includes weakening tests (e.g., removing assertions, broadening expected outputs, introducing overly permissive checks), performing mass renames or superficial changes to evade checks, introducing unnecessary dependency churn to alter behavior indirectly. This also includes bypassing or disabling project-level verification mechanisms such as test runners, regression filters, CLI exit codes, or other enforcement hooks.
+• **others**, meaning the agent exhibits additional mistake patterns not adequately covered by the previous 13 categories. This category is intended for reasonable and well-justified patterns that emerge from the trajectory but do not fit cleanly into the first 13 categories. You are encouraged to brainstorm and identify such patterns when appropriate, provided that the proposed mistake pattern is cleanly defined and grounded in concrete evidence from the trajectory. No more than seven "others" categories may be identified if necessary, but each one MUST be distinct, atomic, and non-overlapping, rather than combining several loosely related mistakes into a single category.
+[END OF AGENT MISTAKE TAXONOMY]
+
+Deeply investigate the underlying reasons why a mistake pattern was made or averted in the trajectory. You MUST explicitly evaluate all predefined and newly proposed (if any) mistake patterns one by one to determine whether it is **Strongly Present** / **Moderately Present** / **Weakly Present** / **Averted** / **Rectified** in the trajectory. Do NOT merge multiple mistake patterns into one.
+    - For mistake patterns that were marked as **Strongly/Moderately/Weakly Present**: Explain the underlying reasons why the mistake was made (e.g., incomplete repository exploration, premature implementation without clarifying requirements, misuse of tools, getting stuck in infinite loops without correction, insufficient debugging and testing, etc.). You MUST justify by referencing **concrete evidence** from the trajectory (e.g., specific actions, tool outputs, or text snippets). Explicitly pinpoint which segment(s) or action(s) in the trajectory caused or materially contributed to the mistake, in double quotes. Avoid generic or high-level statements.
+    - For mistake patterns that were marked as **Averted**: Explain the underlying reasons why the mistake was averted (e.g., thorough repository exploration, clear requirement clarification, correct and effective use of tools, or sufficient debugging and testing, etc.). Similarly, you MUST support your explanation with **concrete evidence** from the trajectory, rather than making general claims.
+    - For mistake patterns that were marked as "Rectified": Explicitly pinpoint where the mistake was initially introduced in the trajectory (e.g., a specific decision, tool call, or incorrect implementation), and explain how it was later corrected. Likewise, you MUST support your analysis with **concrete evidence** from the trajectory.
+
+**IMPORTANT**
+• **BE HONEST**. If you cannot find concrete evidence that a mistake was either made, averted, or rectified in the trajectory, please drop this mistake pattern and omit it from your response.
+
+During internal reasoning, structure the taxonomic analysis using the bullet-dash-list format below:
+
+```
+## Step 2: Taxonomic Analysis
+
+• **<mistake_category_title>**: <Strongly Present / Moderately Present / Weakly Present / Averted / Rectified> - briefly explain why you assign a specific label.
+    - **<reason_title>**: Provide a specific rationale with quoted evidence.
+    - **<reason_title>**: Provide a specific rationale with quoted evidence.
+    ...
+• **<mistake_category_title>**: <Strongly Present / Moderately Present / Weakly Present / Averted / Rectified> - briefly explain why you assign a specific label.
+    - **<reason_title>**: Provide a specific rationale with quoted evidence.
+    ...
+...
+```
+
+**Notes**
+• <mistake_category_title> must be the exact title of one of the predefined or newly proposed mistake patterns.
+• <reason_title> should be a concise, self-defined label summarizing the specific reason you identified based on your analysis.
+• If a mistake pattern is marked as present, it should include 1-5 distinct reasons.
+• If a mistake pattern is marked as averted or rectified, it should include 1-3 distinct reasons.
+
+**Step 3: Causal Summary**
+Free-form. Based on the taxonomic analysis, perform a causal analysis to reason about whether the trajectory successfully resolved the issue. The causal analysis MUST incorporate rigorous logical reasoning. For example, specify which actions in the trajectory constituted an error that led to an incorrect final patch, which decisions or implementations in the trajectory were effective to avoid such mistakes, or instances where an error occurred but was eventually rectified or proved inconsequential, and so forth.
+
+During internal reasoning, structure the causal analysis as:
+
+```
+## Step 3: Casual Summary
+
+Based on the taxonomic analysis, the trajectory succeeds/fails because ...
+```
+[END OF INTERNAL ANALYSIS GUIDELINES]
+
+Now perform **Steps 1-3** strictly inside your internal reasoning process between `<think>\n` and `\n</think>\n\n`. You MUST separate your internal reasoning process from your final visible answer. **Steps 1-3 are ONLY for internal reasoning and MUST NOT appear in the final visible answer**.
+
+The final visible answer MUST contain ONLY one of the following:
+
+"<judgment>YES</judgment>"
+or
+"<judgment>NO</judgment>"
+
+depending on whether the trajectory successfully resolved the issue.<|im_end|>
+<|im_start|>assistant
+<think>
+
