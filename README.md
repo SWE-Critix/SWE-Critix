@@ -14,7 +14,7 @@
 </div>
 
 
-SWE-Critix presents an LLM post-training pipeline for evaluating coding-agent trajectories (Figure 1). The trained model (verifier) takes a trajectory as input, which consists of an issue or requirement description and the agent's recorded process of implementing a solution. If the model determines that the trajectory successfully resolves the issue or fulfills the requirement, it outputs `<judgment>YES</judgment>`; otherwise, it outputs `<judgment>NO</judgment>`. Before making the binary judgment, the model also produces a chain-of-thought (CoT) rationale that justifies its decision. The rationale includes a summary of the trajectory, an analysis of the error type, and a causal analysis of the factors leading to the success or failure of the trajectory (Figure 1 - Application).
+SWE-Critix presents an LLM post-training pipeline for evaluating coding-agent trajectories ([Figure 1](#fig1)). The trained model (verifier) takes a trajectory as input, which consists of an issue or requirement description and the agent's recorded process of implementing a solution. If the model determines that the trajectory successfully resolves the issue or fulfills the requirement, it outputs `<judgment>YES</judgment>`; otherwise, it outputs `<judgment>NO</judgment>`. Before making the binary judgment, the model also produces a chain-of-thought (CoT) rationale that justifies its decision. The rationale includes a summary of the trajectory, an analysis of the error type, and a causal analysis of the factors leading to the success or failure of the trajectory (Figure 1 - Application).
 
 <br>
 
@@ -30,7 +30,7 @@ SWE-Critix adopts a three-stage post-training pipeline. First, a teacher model i
 We open source the model weights, datasets, and training scripts 
 - [SFT](https://huggingface.co/SWE-Critix/SWE-Critix-Qwen3-30B-A3B-SFT-Epoch3) and [RL](https://huggingface.co/SWE-Critix/SWE-Critix-Qwen3-30B-A3B-RL-Step-3396) checkpoints
 - [SFT](https://huggingface.co/datasets/SWE-Critix/alpaca_style_sft_dataset), [RL](https://huggingface.co/datasets/SWE-Critix/rl_dataset), and [Test](https://huggingface.co/datasets/SWE-Critix/test_dataset) datasets
-- [SFT](./scripts/sft) and [RL](./scripts/sft/rl) training scripts (tested on Ascend 910 NPUs)
+- [SFT](./scripts/sft) and [RL](./scripts/rl) training scripts (tested on Ascend 910 NPUs)
 
 
 ## Data Collection
@@ -70,7 +70,7 @@ The final data distribution is summarized in [Figure 1 — Data Splits](#fig1).
 
 ## CoT Annotation
 
-We use a more capable teacher LLM to generate CoT annotations. Specifically, for each pair of successful and failed trajectories of an issue in the SFT set, we instruct the teacher LLM to comparatively analyze the two trajectories, identifying the root causes of failure in the failed trajectory and the key reasons for success in the successful trajectory. We use [this prompt template](./prompt_templates/pairwise_evaluate_coding_agent_trajectories.txt), where `{traj_1}` and `{traj_2}` correspond to the failed and successful trajectories, respectively. The teacher LLM produces responses in the following format:
+We use a more capable teacher LLM to generate CoT annotations. Specifically, for each pair of successful and failed trajectories of an issue in the SFT set, we instruct the teacher LLM to comparatively analyze the two trajectories, identifying the root causes of failure in the failed trajectory and the key reasons for success in the successful trajectory. We use [pairwise_evaluate_coding_agent_trajectories.txt](./prompt_templates/pairwise_evaluate_coding_agent_trajectories.txt) as the prompt template, where `{traj_1}` and `{traj_2}` correspond to the failed and successful trajectories, respectively. The teacher LLM produces responses in the following format:
 
 ```
 <issue_specification> # A concise summary of the issue specification </issue_specification>
@@ -84,7 +84,7 @@ We use a more capable teacher LLM to generate CoT annotations. Specifically, for
 <trajectory_2_causal_analysis> # A causal analysis to answer the key factors behind trajectory 2's success </trajectory_2_causal_analysis>
 ```
 
-We extract the `summary`, `taxonomic_analysis`, and `causal_analysis` sections as the CoT for each trajectory. Before assembling the final SFT samples, we perform grammatical post-processing on the six sections extracted above. Since the annotations are generated through pairwise comparison, each section may explicitly or implicitly refer to the presence of both trajectories. Explicit references include trajectory identifiers such as "Traj 1", "T2", or "the first trajectory", while implicit references include comparative terms such as "also", "as well", and "whereas". However, our goal is to train the final model to perform pointwise judgment, meaning that the CoT for a given trajectory should not contain any words or phrases that imply the existence of another trajectory. We therefore use the same teacher model to rewrite these sections accordingly, following [this prompt template](./prompt_templates/rename_trajectory.txt).
+We extract the `summary`, `taxonomic_analysis`, and `causal_analysis` sections as the CoT for each trajectory. Before assembling the final SFT samples, we perform grammatical post-processing on the six sections extracted above. Since the annotations are generated through pairwise comparison, each section may explicitly or implicitly refer to the presence of both trajectories. Explicit references include trajectory identifiers such as "Traj 1", "T2", or "the first trajectory", while implicit references include comparative terms such as "also", "as well", and "whereas". However, our goal is to train the final model to perform pointwise judgment, meaning that the CoT for a given trajectory should not contain any words or phrases that imply the existence of another trajectory. We therefore use the same teacher model to rewrite these sections accordingly, using [rename_trajectory.txt](./prompt_templates/rename_trajectory.txt) as the prompt template.
 
 The post-processed CoTs are then assembled into the SFT samples. Conceptually, an SFT sample takes the following form:
 
@@ -212,7 +212,7 @@ We show the SFT loss curve in [Figure 2](#fig2).
 
 #### Step 4: Convert Megatron weights back to Hugging Face format
 
-After training is complete, we use [ckpt_convert_qwen3_moe_mcore2hf.sh](./scripts/sft/ckpt_convert_qwen3_moe_mcore2hf.sh) to convert a specified Megatron checkpoint, determined by the iteration number in `/path/to/megatron_checkpoints/latest_checkpointed_iteration.txt`, back to its Hugging Face format:
+After training is complete, we use [ckpt_convert_qwen3_moe_mcore2hf.sh](./scripts/sft/ckpt_convert_qwen3_moe_mcore2hf.sh) to convert a specified Megatron checkpoint, determined by the iteration number in `latest_checkpointed_iteration.txt`, back to its Hugging Face format:
 
 ```
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
@@ -314,3 +314,7 @@ python -m verl.model_merger merge \
 ```
 
 We release the checkpoint at iteration 3396 on [Hugging Face](https://huggingface.co/SWE-Critix/SWE-Critix-Qwen3-30B-A3B-RL-Step-3396).
+
+
+## Eval
+Coming soon...
