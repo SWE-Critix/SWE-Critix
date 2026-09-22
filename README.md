@@ -200,7 +200,7 @@ MASTER_ADDR - master node IP
 NODE_RANK - node rank (0, 1, 2, ...)
 ```
 
-We show the SFT loss curve in [Figure 2](#fig2).
+We show the SFT loss curve in [Figure 2](#fig2) or in [mindspeed_lm_loss.html](./assets/html/mindspeed_lm_loss.html).
 <br>
 
 <div id="fig2" align="center">
@@ -282,7 +282,7 @@ NIC - current node network inferface card
 CURRENT_IP - current node IP
 ```
 
-We show the RL reward curve in [Figure 3](#fig3).
+We show the RL reward curve in [Figure 3](#fig3) or in [verl_metrics.html](./assets/html/verl_metrics.html).
 <br>
 
 <div id="fig3" align="center">
