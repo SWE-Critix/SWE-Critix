@@ -1,12 +1,12 @@
 <div align="center">
   <img src="assets/images/logo.jpeg" alt="Logo" height="150">
   
-  <h1>SWE-Critix: Post-training Generalist Verifiers for Assessing Coding Agent Trajectories</h1>
+  <h1>SWE-Critix: Post-Training Generalist Verifiers for Assessing Coding-Agent Trajectories</h1>
 </div>
 
 <div align="center">
 
-[![Paper](https://img.shields.io/static/v1?label=Coming%20soon&message=Paper&color=red&logo=arxiv&logoColor=white)](https://arxiv.org/pdf/xxxx.xxxxx)
+[![Paper](https://img.shields.io/static/v1?label=2610.13356&message=Paper&color=red&logo=arxiv&logoColor=white)](https://arxiv.org/abs/2610.13356)
 [![GitHub](https://img.shields.io/badge/GitHub-SWE--Critix-181717?logo=github&logoColor=white)](https://github.com/SWE-Critix/SWE-Critix)
 [![Hugging Face](https://img.shields.io/badge/Hugging%20Face-SWE--Critix-yellow?logo=huggingface)](https://huggingface.co/SWE-Critix)
 </a>
@@ -314,7 +314,3 @@ python -m verl.model_merger merge \
 ```
 
 We release the checkpoint at iteration 3396 on [Hugging Face](https://huggingface.co/SWE-Critix/SWE-Critix-Qwen3-30B-A3B-RL-Step-3396).
-
-
-## Eval
-Coming soon...
