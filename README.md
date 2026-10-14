@@ -6,7 +6,7 @@
 
 <div align="center">
 
-[![Paper](https://img.shields.io/static/v1?label=2610.13356&message=Paper&color=red&logo=arxiv&logoColor=white)](https://arxiv.org/abs/2610.13356)
+[![Paper](https://img.shields.io/static/v1?label=2610.13356&message=Paper&color=red&logo=arxiv&logoColor=white)](https://arxiv.org/abs/2610.13356v2)
 [![GitHub](https://img.shields.io/badge/GitHub-SWE--Critix-181717?logo=github&logoColor=white)](https://github.com/SWE-Critix/SWE-Critix)
 [![Hugging Face](https://img.shields.io/badge/Hugging%20Face-SWE--Critix-yellow?logo=huggingface)](https://huggingface.co/SWE-Critix)
 </a>
